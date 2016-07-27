@@ -1,4 +1,8 @@
 from StringMatcher import StringMatcher
 
-ss = StringMatcher(seq1='dupa', seq2='kupa')
-print (ss.distance())
+if __name__ == "__main__":
+
+    ss = StringMatcher()
+    ss.set_seqs('poprawiam','pozdrawiam')
+
+    print (ss.distance())
