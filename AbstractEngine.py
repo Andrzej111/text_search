@@ -6,7 +6,8 @@ class AbstractSearchEngine(object):
     basic usage:
     engine = SomeEngine()
     engine.add_documents(document_list)
-
+    for id,similiarity_value in engine.search('string'):
+        
     """
 
     __metaclass__ = ABCMeta
@@ -31,7 +32,12 @@ class AbstractSearchEngine(object):
         self._documents = []
 
     def get_document_by_id(self, id):
-        return self._documents[id]
+        try:
+            return self._documents[id]
+        except Exception as e:
+            print (e)
+            print ('id: ',id)
+            print('documents: ',self._documents)
 
     def window(self, seq, n=1):
         it = iter(seq)
