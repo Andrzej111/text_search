@@ -16,7 +16,7 @@ class TfidfEngine(AbstractSearchEngine):
 
     # maximum levenshtein distance between misspelled ngram(word/phrase) and ngram in corpus
     # will correct given number of mistakes, ngrams with same distance share weight
-    MAX_LEVENSHTEIN_DISTANCE = 3
+    MAX_LEVENSHTEIN_DISTANCE = 1
 
     def __init__(self):
         super(TfidfEngine, self).__init__()
@@ -36,7 +36,7 @@ class TfidfEngine(AbstractSearchEngine):
             self._search(search_string, n=nmax)
         dd={}
         for k in sorted(self._tmp_dict,key=self._tmp_dict.get):
-            yield (k,self._tmp_dict[k])
+            yield (self._position_key_map[k],self._tmp_dict[k])
 
     def _search(self, search_string, n):
         (self._tfidf, self._index, self._dictionary) = self._subengines[n]
@@ -60,7 +60,7 @@ class TfidfEngine(AbstractSearchEngine):
             self._subengines[i] = (self._tfidf, self._index, self._dictionary)
 
     def _prepare(self,ngram=1):
-        texts = [[word for word in self.make_bag(document, n=ngram)] for document in self._documents]
+        texts = [[word for word in self.make_bag(document, n=ngram)] for document in self._documents.values()]
         frequency = defaultdict(int)
 
         for text in texts:
@@ -70,8 +70,13 @@ class TfidfEngine(AbstractSearchEngine):
                   for text in texts]
         dictionary = corpora.Dictionary(texts)
         vectorized = []
-        for doc in self._documents:
+        self._position_key_map = {}
+        for key, doc in self._documents.items():
             vectorized.append(dictionary.doc2bow(self.make_bag(doc, n=ngram)))
+            self._position_key_map[len(vectorized)-1] = key
+            
+        #for key, doc in self._documents.items():
+        #    vectorized.update({key:dictionary.doc2bow(self.make_bag(doc, n=ngram))})
 
         self._tfidf = models.TfidfModel(vectorized)
         self._index = similarities.SparseMatrixSimilarity(self._tfidf[vectorized], num_features=len(dictionary.keys()))

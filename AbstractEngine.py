@@ -15,7 +15,7 @@ class AbstractSearchEngine(object):
     def __init__(self):
         # list of strings
         super(AbstractSearchEngine, self).__init__()
-        self._documents = []
+        self._documents = {}
 
     @abstractmethod
     def search(self, search_string):
@@ -25,11 +25,28 @@ class AbstractSearchEngine(object):
     def prepare(self):
         pass
 
+    def _next_numeric_id(self):
+        iterator = len (self._documents.keys())
+        while True:
+            if iterator not in self._documents.keys():
+                return iterator
+            iterator+=1
+
     def add_documents(self, documents):
-        self._documents +=list(documents)
+        ''' supports:
+                - dictionaries 
+                - lists (keys sequence from 0)
+        '''
+        if isinstance(documents, list):
+            for doc in documents:
+                self._documents[self._next_numeric_id()]=doc
+        elif isinstance(documents, dict):
+            self._documents.update(documents)
+        else:
+            raise TypeError("\"Documents\" can only be dictionary or list")
 
     def clear_documents(self):
-        self._documents = []
+        self._documents = {}
 
     def get_document_by_id(self, id):
         try:
@@ -37,7 +54,7 @@ class AbstractSearchEngine(object):
         except Exception as e:
             print (e)
             print ('id: ',id)
-            print('documents: ',self._documents)
+#            print('documents: ',self._documents)
 
     def window(self, seq, n=1):
         it = iter(seq)
