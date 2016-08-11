@@ -1,4 +1,3 @@
-
 from TfidfEngine import TfidfEngine
 from functools import wraps
 from io import open
@@ -7,10 +6,13 @@ import sys
 
 
 class DocumentSearcher(object):
+    ''' higher level searcher 
+        for easier use in scripts and apps
+    '''
     # TODO make it use other Engines
     def __init__(self):
         self._lock = Lock()
-        self._outer_lock = Lock()
+#        self._outer_lock = Lock()
 
         # default engine is TF-IDF
         self._engine = TfidfEngine()
@@ -34,29 +36,31 @@ class DocumentSearcher(object):
         t1 = Thread(target=self._add_documents, args=(doc_list,))
         t1.start()
         
-    def get_documents(self):
-        return self._engine._documents
-    def search(self,search_string):
+    def search(self,search_string, *args, **kwargs):
         with self._lock:
-            return self._engine.search(search_string,nmax=3)
+            return self._engine.search(search_string,*args,**kwargs)
 
     def get_best_match(self, search_string):
-        ''' returns (id, document) 2-tuple of best match'''
-        with self._lock:
-            best_m = None
-            for k,v in self._engine.search(search_string,nmax=3):
+        ''' returns (id, full_document) 2-tuple of best match'''
+        best_value = 0.0
+        best_m = None
+        # should be first but we will check anyways
+        for k,v in self.search(search_string):
+            if best_value < v:
+                best_value = v
                 best_m = k
-            if best_m is not None:
-                return best_m,self._engine.get_document_by_id(best_m)
-            else:
-                return None
+        if best_m is not None:
+            return best_m,self._engine.get_document_by_id(best_m)
+        else:
+            return None
 
     def get_document(self, id):
         return self._engine.get_document_by_id(id)
 
     def __enter__(self):
-        self._outer_lock.acquire()
+#        self._outer_lock.acquire()
         return self
         
     def __exit__(self,ex,tx,tb):
-        self._outer_lock.release()
+        pass
+#        self._outer_lock.release()

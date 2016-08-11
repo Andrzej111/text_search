@@ -5,17 +5,18 @@ class AbstractSearchEngine(object):
     """abstract class for search engines
     basic usage:
     engine = SomeEngine()
-    engine.add_documents(document_list)
-    for id,similiarity_value in engine.search('string'):
-        
+    engine.add_documents(document_list_or_string)
+    engine.prepare()
+    for id,similarity_value in engine.search('my favourite string'):
+        something
     """
 
     __metaclass__ = ABCMeta
 
     def __init__(self):
-        # list of strings
         super(AbstractSearchEngine, self).__init__()
         self._documents = {}
+        self._stop_regexes = []
 
     @abstractmethod
     def search(self, search_string):
@@ -33,9 +34,12 @@ class AbstractSearchEngine(object):
             iterator+=1
 
     def add_documents(self, documents):
-        ''' supports:
+        ''' adds documents to corpus
+            probably need to run prepare() after, to use engine 
+            supports:
                 - dictionaries 
                 - lists (keys sequence from 0)
+            but DO NOT mix both in same engine
         '''
         if isinstance(documents, list):
             for doc in documents:
@@ -54,7 +58,6 @@ class AbstractSearchEngine(object):
         except Exception as e:
             print (e)
             print ('id: ',id)
-#            print('documents: ',self._documents)
 
     def window(self, seq, n=1):
         it = iter(seq)
@@ -65,10 +68,29 @@ class AbstractSearchEngine(object):
             append(e)
             yield win
 
-    # makes bag of printable ngrams
+    def set_stop_regexes(self, regex_strings):
+        ''' sets regular expressions for which words are exluded from searching 
+            example:
+                some_engine.set_stop_regexes(['\d+','the'])
+        ''' 
+        self._stop_regexes = list(regex_strings)
+                
+    def string_matches_any(self, string, regexes):
+        for r in regexes:
+            if re.match(r,string):
+                return True
+        return False
+
     def make_bag(self, st, n=1):
+        ''' makes bag of printable ngrams
+            after splitting words removes these that match any of self._stop_regexes'''
         bag = []
-        for win in self.window(re.sub(r'\W+', ' ', st.lower()).split(), n=n):
+        sequence = re.sub(r'\W+', ' ', st.lower()).split()
+        sss = []
+        for seq_i in sequence:
+            if not self.string_matches_any(seq_i, self._stop_regexes):
+                sss.append(seq_i)
+        for win in self.window(sss, n=n):
             try:
                 phrase = ' '.join(list(win))
                 bag.append(phrase)
