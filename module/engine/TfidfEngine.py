@@ -1,9 +1,13 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 from typing import overload
 from gensim import corpora,models,similarities
 from collections import defaultdict
-from StringMatcher import StringMatcher
-from AbstractEngine import AbstractSearchEngine
+from .StringMatcher import StringMatcher 
+from .AbstractEngine import AbstractSearchEngine
 import unittest
+import six
 
 class TfidfEngine(AbstractSearchEngine):
 
@@ -38,19 +42,19 @@ class TfidfEngine(AbstractSearchEngine):
 
     def search(self, search_string, nmax=MAX_NGRAM):
         ''' searches through whole corpus
-            returns generator object returning 2-tuples:
+            returns generator object of 2-tuples:
             - document's key for which similarity value is greater than 0
             - similarity value
         '''  
         # dict stores and adds value from each subengine run
+        # TODO: check if defaultdict(int) would work faster or slower
         self._tmp_dict = {}
         actual_max = min(nmax, len(self.make_bag(search_string,n=1)))
         for nmax in range(1,actual_max+1):
             self._search(search_string, n=nmax)
-
+        self._subset_bonus(search_string)
         for k in sorted(self._tmp_dict,key=self._tmp_dict.get, reverse=True):
             yield (k,self._tmp_dict[k])
-            #yield (self._position_key_map[k],self._tmp_dict[k])
 
     def _search(self, search_string, n):
         (self._tfidf, self._index, self._dictionary) = self._subengines[n]
@@ -59,8 +63,8 @@ class TfidfEngine(AbstractSearchEngine):
         sims = self._index[self._tfidf[vector]]
         matches=dict(enumerate(sims))
         # sorted
-        smatches = sorted(matches,key=matches.get)
-        for id in smatches:
+        #smatches = sorted(matches,key=matches.get)
+        for id in matches:
             key_id = self._position_key_map[id]
             if matches[id]==0:
                 continue
@@ -68,6 +72,17 @@ class TfidfEngine(AbstractSearchEngine):
                 self._tmp_dict[key_id]+=matches[id]
             else:
                 self._tmp_dict[key_id] = matches[id]
+
+    def _subset_bonus(self, search_string):
+        ''' _subset_bonus adds 1.0 to value if all words in 
+            string are in document
+        '''
+        set_ = set(self.make_bag(search_string,n=1))
+        for k in self._tmp_dict:
+            if set_.issubset(set(self.make_bag(self.get_document_by_id(k), n=1 ))):
+#                print (set_)
+#                print (k)
+                self._tmp_dict[k] += 1
 
     def prepare(self):
         for i in range(1, TfidfEngine.MAX_NGRAM+1):
@@ -99,20 +114,18 @@ class TfidfEngine(AbstractSearchEngine):
             attributes (ids) vector 
         '''
         vec = []
+        #print (wordlist)
         for word in wordlist:
             try:
                 vec.append((self._dictionary.token2id[word], 1))
             except KeyError as e:
                 # find nearest neighbour (shortest Levenshtein distance) if word doesn't exist
                 matches = self._nearest_neighbours(word)
-#                print (len(matches))
-#                print (matches)
                 if len(matches)==0 or matches[0]==None:
                     continue
                 for bb in matches:
                     # add weight inversely proportional to number of matches with equal distance
                     vec.append((bb, 1.0/len(matches)))
-                print (len(matches))
         return vec
 
     def _nearest_neighbours(self, word):
@@ -120,6 +133,12 @@ class TfidfEngine(AbstractSearchEngine):
             up to MAX_LEVENSHTEIN_DISTANCE
             returns list of words with same, minimum distance
         '''
+        if six.PY2:
+            try:
+                word = u'' + word.decode("utf-8")
+            except:
+                word = u'' + word
+
         matcher = StringMatcher()
         matcher.set_seq1(word)
         min_dist = (TfidfEngine.MAX_LEVENSHTEIN_DISTANCE, [None])
@@ -141,10 +160,11 @@ class TfidfEngine(AbstractSearchEngine):
 class BasicTFIDFSearchTestSuite(unittest.TestCase):
     def setUp(self):
         d0 = "one two three"
-        d1 = "one four five six"
-        d2 = "one six six eight"
+        d1 = "one four five six four"
+        d2 = "one four six six six "
         d3 = "one łan łąki bą"
         d4 = "one reallylongword"
+            
         self.engine = TfidfEngine()
         self.engine.add_documents({
                 0:d0,
@@ -155,7 +175,7 @@ class BasicTFIDFSearchTestSuite(unittest.TestCase):
                 })
         self.engine.prepare()
         
-    def test_word_in_one(self):
+    def test_word_in_single_document(self):
         k = self.engine.find_best_match('five')
         self.assertEqual(k,1)
 
@@ -174,6 +194,30 @@ class BasicTFIDFSearchTestSuite(unittest.TestCase):
         for k, v in self.engine.search('six'):
             kv_dict[k] = v
         self.assertTrue( kv_dict[2] > kv_dict[1])
+        
+    def test_2gram(self):
+        kv_dict = dict ( self.engine.search('six four') )
+        self.assertTrue( kv_dict[1] > kv_dict[2])
+
+    def test_word_in_each_document_doesnt_distinguish(self):
+        k = self.engine.find_best_match('one')
+        self.assertIsNone(k)
+
+    def test_nonexistent_word_returns_none(self):
+        k = self.engine.find_best_match('nonexistentword')
+        self.assertIsNone(k)
+
+    def test_unicode_one_distance(self):
+        k = self.engine.find_best_match('łaki')
+        self.assertEqual(k,3)
+
+    def test_better_matches_first(self):
+        gen = self.engine.search('one two three six łąki')
+        k,old_v = next(gen)
+        for k,v in gen:
+            self.assertTrue( v < old_v )
+            old_v = v
+        
 
 if __name__ == '__main__':
     unittest.main()

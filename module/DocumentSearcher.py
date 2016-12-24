@@ -1,4 +1,4 @@
-from TfidfEngine import TfidfEngine
+from .engine.TfidfEngine import TfidfEngine
 from functools import wraps
 from io import open
 from threading import Thread,Lock
@@ -9,7 +9,7 @@ class DocumentSearcher(object):
     ''' higher level searcher 
         for easier use in scripts and apps
     '''
-    # TODO make it use other Engines
+    # TODO make it use other Engines too
     def __init__(self):
         self._lock = Lock()
 #        self._outer_lock = Lock()
@@ -28,13 +28,19 @@ class DocumentSearcher(object):
             self._engine.add_documents(doc_list)
             self._engine.prepare()
 
-    def set_documents(self, doc_list):
-        t1 = Thread(target=self._set_documents, args=(doc_list,))
-        t1.start()
+    def set_documents(self, doc_list, async = True):
+        if async:
+            t1 = Thread(target=self._set_documents, args=(doc_list,))
+            t1.start()
+        else:
+            self._set_documents(doc_list)
 
-    def add_documents(self, doc_list):
-        t1 = Thread(target=self._add_documents, args=(doc_list,))
-        t1.start()
+    def add_documents(self, doc_list, async = True):
+        if async:
+            t1 = Thread(target=self._add_documents, args=(doc_list,))
+            t1.start()
+        else:
+            self._add_documents(doc_list)
         
     def search(self,search_string, *args, **kwargs):
         with self._lock:

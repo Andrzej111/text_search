@@ -1,6 +1,8 @@
+import six
 from abc import ABCMeta,abstractmethod
 from collections import deque
 import re, string
+import logging
 class AbstractSearchEngine(object):
     """abstract class for search engines
     basic usage:
@@ -17,6 +19,7 @@ class AbstractSearchEngine(object):
         super(AbstractSearchEngine, self).__init__()
         self._documents = {}
         self._stop_regexes = []
+        self.logger = logging.getLogger(str(self.__class__))
 
     @abstractmethod
     def search(self, search_string):
@@ -85,7 +88,10 @@ class AbstractSearchEngine(object):
         ''' makes bag of printable ngrams
             after splitting words removes these that match any of self._stop_regexes'''
         bag = []
-        sequence = re.sub(r'\W+', ' ', st.lower()).split()
+        sequence = None
+
+        # re.UNICODE doesn't work anyway LUL
+        sequence = re.sub(r'\W+', ' ', st.lower(), re.UNICODE).split()
         sss = []
         for seq_i in sequence:
             if not self.string_matches_any(seq_i, self._stop_regexes):
